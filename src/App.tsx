@@ -168,41 +168,61 @@ export default function App() {
             </div>
 
             <div className="grid md:grid-cols-2 gap-6">
-              <div className="bg-white p-6 rounded-3xl shadow-md space-y-4">
-                <h3 className="font-bold text-xs uppercase text-slate-400">Configuração do Kit</h3>
-                <label className="block text-sm font-bold text-slate-700">
-                  Potência Painel (W): 
-                  <input 
-                    type="number" 
-                    value={potPainel || ''} 
-                    onChange={(e) => setPotPainel(parseFloat(e.target.value) || 0)} 
-                    className="mt-1 w-full bg-slate-50 p-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                  />
-                </label>
-                <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-6">
+                <div className="bg-white p-6 rounded-3xl shadow-md space-y-4">
+                  <h3 className="font-bold text-xs uppercase text-slate-400">Configuração do Kit</h3>
                   <label className="block text-sm font-bold text-slate-700">
-                    Tensão do Sistema:
-                    <select 
-                      value={tensao} 
-                      onChange={(e) => setTensao(parseFloat(e.target.value))} 
-                      className="mt-1 w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-bold focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                    >
-                      <option value="12">12V</option>
-                      <option value="24">24V</option>
-                      <option value="48">48V</option>
-                    </select>
+                    Potência Painel (W): 
+                    <input 
+                      type="number" 
+                      value={potPainel || ''} 
+                      onChange={(e) => setPotPainel(parseFloat(e.target.value) || 0)} 
+                      className="mt-1 w-full bg-slate-50 p-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                    />
                   </label>
-                  <label className="block text-sm font-bold text-slate-700">
-                    Tipo de Bateria:
-                    <select 
-                      value={tipoBateria} 
-                      onChange={(e) => setTipoBateria(parseFloat(e.target.value))} 
-                      className="mt-1 w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-bold focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                    >
-                      <option value="0.85">Lítio</option>
-                      <option value="0.50">Chumbo</option>
-                    </select>
-                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="block text-sm font-bold text-slate-700">
+                      Tensão do Sistema:
+                      <select 
+                        value={tensao} 
+                        onChange={(e) => setTensao(parseFloat(e.target.value))} 
+                        className="mt-1 w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-bold focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                      >
+                        <option value="12">12V</option>
+                        <option value="24">24V</option>
+                        <option value="48">48V</option>
+                      </select>
+                    </label>
+                    <label className="block text-sm font-bold text-slate-700">
+                      Tipo de Bateria:
+                      <select 
+                        value={tipoBateria} 
+                        onChange={(e) => setTipoBateria(parseFloat(e.target.value))} 
+                        className="mt-1 w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-bold focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                      >
+                        <option value="0.85">Lítio</option>
+                        <option value="0.50">Chumbo</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-3xl shadow-md space-y-4 border-l-4 border-blue-500">
+                  <h3 className="font-bold text-xs uppercase text-slate-400">Detalhes da Bateria</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-[10px] uppercase text-slate-400 font-semibold tracking-wider">Tipo</p>
+                      <div className="font-bold text-slate-700">{tipoBateria > 0.6 ? 'Lítio (LiFePO4)' : 'Chumbo-Ácido'}</div>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase text-slate-400 font-semibold tracking-wider">Capacidade</p>
+                      <div className="font-bold text-slate-700">{bat} Ah</div>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-[10px] uppercase text-slate-400 font-semibold tracking-wider">Vida Útil Estimada</p>
+                      <div className="font-bold text-slate-700">{tipoBateria > 0.6 ? '+4.000 ciclos (~10 anos)' : '~500 ciclos (~2 anos)'}</div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
