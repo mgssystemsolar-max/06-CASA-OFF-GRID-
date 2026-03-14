@@ -11,6 +11,12 @@ interface LoadItem {
   fatorPartida: number;
 }
 
+const StepBadge = ({ num }: { num: number }) => (
+  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-yellow-500 text-white font-bold text-xs mr-2 shadow-sm shrink-0">
+    {num}
+  </span>
+);
+
 export default function App() {
   const [itens, setItens] = useState<LoadItem[]>([
     { id: '1', nome: "Geladeira", qtd: 1, w: 150, h: 24, fatorPartida: 5 },
@@ -31,6 +37,11 @@ export default function App() {
   const [fatorTemperatura, setFatorTemperatura] = useState<number>(1);
   const [capacidadeBateriaIndividual, setCapacidadeBateriaIndividual] = useState<number>(220);
   const [tensaoBateriaIndividual, setTensaoBateriaIndividual] = useState<number>(12);
+
+  const [clienteNome, setClienteNome] = useState('');
+  const [clienteTelefone, setClienteTelefone] = useState('');
+  const [clienteEmail, setClienteEmail] = useState('');
+  const [clienteCidade, setClienteCidade] = useState('');
 
   useEffect(() => {
     if (tipoBateria === 'Lítio') {
@@ -159,6 +170,7 @@ export default function App() {
             onClick={() => window.print()} 
             className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 transition-colors text-black px-6 py-2 rounded-xl font-bold"
           >
+            <StepBadge num={9} />
             <Printer size={20} />
             PDF Proposta
           </button>
@@ -167,8 +179,56 @@ export default function App() {
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white p-6 rounded-3xl shadow-md">
+              <h2 className="font-bold uppercase text-slate-500 mb-4 flex items-center">
+                <StepBadge num={1} /> Dados do Cliente
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label className="block text-sm font-bold text-slate-700">
+                  Nome do Cliente:
+                  <input 
+                    type="text" 
+                    value={clienteNome} 
+                    onChange={(e) => setClienteNome(e.target.value)} 
+                    className="mt-1 w-full bg-slate-50 p-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                    placeholder="Ex: João da Silva"
+                  />
+                </label>
+                <label className="block text-sm font-bold text-slate-700">
+                  Telefone:
+                  <input 
+                    type="text" 
+                    value={clienteTelefone} 
+                    onChange={(e) => setClienteTelefone(e.target.value)} 
+                    className="mt-1 w-full bg-slate-50 p-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                    placeholder="(00) 00000-0000"
+                  />
+                </label>
+                <label className="block text-sm font-bold text-slate-700">
+                  Email:
+                  <input 
+                    type="email" 
+                    value={clienteEmail} 
+                    onChange={(e) => setClienteEmail(e.target.value)} 
+                    className="mt-1 w-full bg-slate-50 p-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                    placeholder="joao@email.com"
+                  />
+                </label>
+                <label className="block text-sm font-bold text-slate-700">
+                  Cidade/UF:
+                  <input 
+                    type="text" 
+                    value={clienteCidade} 
+                    onChange={(e) => setClienteCidade(e.target.value)} 
+                    className="mt-1 w-full bg-slate-50 p-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                    placeholder="São Paulo - SP"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-3xl shadow-md">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="font-bold uppercase text-slate-500">Cargas Solares</h2>
+                <h2 className="font-bold uppercase text-slate-500 flex items-center"><StepBadge num={2} /> Cargas Solares</h2>
                 <button 
                   onClick={adicionarLinha} 
                   className="flex items-center gap-1 text-yellow-600 hover:text-yellow-700 font-bold transition-colors"
@@ -282,7 +342,7 @@ export default function App() {
             <div className="grid md:grid-cols-2 gap-6">
               <div className="space-y-6">
                 <div className="bg-white p-6 rounded-3xl shadow-md space-y-4">
-                  <h3 className="font-bold text-xs uppercase text-slate-400">Configuração do Kit</h3>
+                  <h3 className="font-bold text-xs uppercase text-slate-400 flex items-center"><StepBadge num={3} /> Configuração do Kit</h3>
                   <div className="grid grid-cols-2 gap-3">
                     <label className="block text-sm font-bold text-slate-700">
                       Potência Painel (W): 
@@ -412,7 +472,7 @@ export default function App() {
                 </div>
 
                 <div className="bg-white p-6 rounded-3xl shadow-md space-y-4 border-l-4 border-blue-500">
-                  <h3 className="font-bold text-xs uppercase text-slate-400">Detalhes da Bateria</h3>
+                  <h3 className="font-bold text-xs uppercase text-slate-400 flex items-center"><StepBadge num={4} /> Detalhes da Bateria</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-[10px] uppercase text-slate-400 font-semibold tracking-wider">Tipo</p>
@@ -437,7 +497,7 @@ export default function App() {
               <div className="space-y-6">
                 <div className="bg-slate-800 border border-slate-700 p-6 rounded-3xl text-white shadow-xl flex flex-col justify-between">
                   <div>
-                    <p className="text-yellow-500 text-[10px] font-bold uppercase tracking-wider">Inversor Mínimo (Pico)</p>
+                    <p className="text-yellow-500 text-[10px] font-bold uppercase tracking-wider flex items-center mb-1"><StepBadge num={5} /> Inversor Mínimo (Pico)</p>
                     <div className="text-4xl font-black mt-1">{maiorPico}W</div>
                   </div>
                   <div className="mt-4 pt-4 border-t border-slate-700 grid grid-cols-2 gap-4">
@@ -453,7 +513,7 @@ export default function App() {
                 </div>
 
                 <div className="bg-white p-6 rounded-3xl shadow-md space-y-4 border-l-4 border-orange-500">
-                  <h3 className="font-bold text-xs uppercase text-slate-400">Queda de Tensão (CC)</h3>
+                  <h3 className="font-bold text-xs uppercase text-slate-400 flex items-center mb-4"><StepBadge num={6} /> Queda de Tensão (CC)</h3>
                   <label className="block text-sm font-bold text-slate-700">
                     Comprimento do Cabo (m):
                     <input 
@@ -493,7 +553,7 @@ export default function App() {
 
           <div className="space-y-6">
             <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-8 rounded-3xl text-white shadow-2xl flex flex-col justify-center">
-              <h3 className="text-yellow-500 font-bold uppercase text-xs tracking-wider mb-8">Kit Solar Fotovoltaico</h3>
+              <h3 className="text-yellow-500 font-bold uppercase text-xs tracking-wider mb-8 flex items-center"><StepBadge num={7} /> Kit Solar Fotovoltaico</h3>
               <div className="space-y-8">
                 <div>
                   <p className="text-slate-400 text-xs uppercase font-bold tracking-wider mb-1">Painéis ({potPainel}W)</p>
@@ -513,7 +573,7 @@ export default function App() {
             </div>
 
             <div className="bg-white p-6 rounded-3xl shadow-md space-y-4">
-              <h3 className="font-bold text-xs uppercase text-slate-400">Balanço Energético Diário</h3>
+              <h3 className="font-bold text-xs uppercase text-slate-400 flex items-center"><StepBadge num={8} /> Balanço Energético Diário</h3>
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
