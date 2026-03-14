@@ -15,7 +15,8 @@ export default function App() {
   ]);
   const [potPainel, setPotPainel] = useState<number>(550);
   const [tensao, setTensao] = useState<number>(24);
-  const [tipoBateria, setTipoBateria] = useState<number>(0.85);
+  const [tipoBateria, setTipoBateria] = useState<string>('Lítio');
+  const [comprimentoCabo, setComprimentoCabo] = useState<number>(5);
 
   const adicionarLinha = () => {
     setItens([...itens, { id: Date.now().toString(), nome: "Novo Item", w: 0, h: 0 }]);
@@ -42,7 +43,9 @@ export default function App() {
     bit,
     inv,
     man,
-    lucro
+    lucro,
+    quedaTensao,
+    quedaPercentual
   } = useMemo(() => {
     let totalWh = 0;
     let maiorPico = 0;
@@ -56,27 +59,34 @@ export default function App() {
     });
 
     const nP = Math.ceil((totalWh * 1.25) / (hsp * potPainel));
-    const bat = totalWh / (tensao * tipoBateria);
+    const dod = tipoBateria === 'Lítio' ? 0.85 : 0.50;
+    const bat = totalWh / (tensao * dod);
     const amp = (nP * potPainel) / tensao;
     
     let bit = amp > 50 ? 16 : (amp > 30 ? 10 : 6);
 
     const inv = (nP * potPainel) * 5.8;
     const eco = (totalWh / 1000) * 30 * 0.95;
-    const man = (tipoBateria > 0.6) ? (bat * tensao * 1.2) : (bat * tensao * 3.5);
+    const man = (tipoBateria === 'Lítio') ? (bat * tensao * 1.2) : (bat * tensao * 3.5);
     const lucro = ((eco * 12 * 10) - inv - man);
+
+    const ampControlador = isNaN(amp) || !isFinite(amp) ? 0 : Math.ceil(amp * 1.1);
+    const quedaTensao = bit > 0 ? (2 * comprimentoCabo * ampControlador * 0.0175) / bit : 0;
+    const quedaPercentual = tensao > 0 ? (quedaTensao / tensao) * 100 : 0;
 
     return {
       maiorPico: Math.ceil(maiorPico),
       nP: isNaN(nP) || !isFinite(nP) ? 0 : nP,
       bat: isNaN(bat) || !isFinite(bat) ? 0 : Math.ceil(bat),
-      amp: isNaN(amp) || !isFinite(amp) ? 0 : Math.ceil(amp * 1.1),
+      amp: ampControlador,
       bit,
       inv: isNaN(inv) ? 0 : inv,
       man: isNaN(man) ? 0 : man,
-      lucro: isNaN(lucro) ? 0 : lucro
+      lucro: isNaN(lucro) ? 0 : lucro,
+      quedaTensao,
+      quedaPercentual
     };
-  }, [itens, potPainel, tensao, tipoBateria]);
+  }, [itens, potPainel, tensao, tipoBateria, comprimentoCabo]);
 
   const formatCurrency = (value: number) => {
     return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -197,11 +207,11 @@ export default function App() {
                       Tipo de Bateria:
                       <select 
                         value={tipoBateria} 
-                        onChange={(e) => setTipoBateria(parseFloat(e.target.value))} 
+                        onChange={(e) => setTipoBateria(e.target.value)} 
                         className="mt-1 w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-bold focus:outline-none focus:ring-2 focus:ring-yellow-400"
                       >
-                        <option value="0.85">Lítio</option>
-                        <option value="0.50">Chumbo</option>
+                        <option value="Lítio">Lítio</option>
+                        <option value="Chumbo">Chumbo</option>
                       </select>
                     </label>
                   </div>
@@ -212,7 +222,7 @@ export default function App() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-[10px] uppercase text-slate-400 font-semibold tracking-wider">Tipo</p>
-                      <div className="font-bold text-slate-700">{tipoBateria > 0.6 ? 'Lítio (LiFePO4)' : 'Chumbo-Ácido'}</div>
+                      <div className="font-bold text-slate-700">{tipoBateria === 'Lítio' ? 'Lítio (LiFePO4)' : 'Chumbo-Ácido'}</div>
                     </div>
                     <div>
                       <p className="text-[10px] uppercase text-slate-400 font-semibold tracking-wider">Capacidade</p>
@@ -220,25 +230,63 @@ export default function App() {
                     </div>
                     <div className="col-span-2">
                       <p className="text-[10px] uppercase text-slate-400 font-semibold tracking-wider">Vida Útil Estimada</p>
-                      <div className="font-bold text-slate-700">{tipoBateria > 0.6 ? '+4.000 ciclos (~10 anos)' : '~500 ciclos (~2 anos)'}</div>
+                      <div className="font-bold text-slate-700">{tipoBateria === 'Lítio' ? '+4.000 ciclos (~10 anos)' : '~500 ciclos (~2 anos)'}</div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-slate-800 border border-slate-700 p-6 rounded-3xl text-white shadow-xl flex flex-col justify-between">
-                <div>
-                  <p className="text-yellow-500 text-[10px] font-bold uppercase tracking-wider">Inversor Mínimo (Pico)</p>
-                  <div className="text-4xl font-black mt-1">{maiorPico}W</div>
-                </div>
-                <div className="mt-4 pt-4 border-t border-slate-700 grid grid-cols-2 gap-4">
+              <div className="space-y-6">
+                <div className="bg-slate-800 border border-slate-700 p-6 rounded-3xl text-white shadow-xl flex flex-col justify-between">
                   <div>
-                    <p className="text-[10px] uppercase text-slate-400 font-semibold tracking-wider">Cabo Bat.</p>
-                    <div className="font-bold text-lg">{bit}mm²</div>
+                    <p className="text-yellow-500 text-[10px] font-bold uppercase tracking-wider">Inversor Mínimo (Pico)</p>
+                    <div className="text-4xl font-black mt-1">{maiorPico}W</div>
                   </div>
-                  <div>
-                    <p className="text-[10px] uppercase text-slate-400 font-semibold tracking-wider">Controlador</p>
-                    <div className="font-bold text-lg">{amp}A</div>
+                  <div className="mt-4 pt-4 border-t border-slate-700 grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-[10px] uppercase text-slate-400 font-semibold tracking-wider">Cabo Bat.</p>
+                      <div className="font-bold text-lg">{bit}mm²</div>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase text-slate-400 font-semibold tracking-wider">Controlador</p>
+                      <div className="font-bold text-lg">{amp}A</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-3xl shadow-md space-y-4 border-l-4 border-orange-500">
+                  <h3 className="font-bold text-xs uppercase text-slate-400">Queda de Tensão (CC)</h3>
+                  <label className="block text-sm font-bold text-slate-700">
+                    Comprimento do Cabo (m):
+                    <input 
+                      type="number" 
+                      value={comprimentoCabo || ''} 
+                      onChange={(e) => setComprimentoCabo(parseFloat(e.target.value) || 0)} 
+                      className="mt-1 w-full bg-slate-50 p-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                      min="0.5"
+                      step="0.5"
+                    />
+                  </label>
+                  <div className="pt-2">
+                    <div className="flex justify-between items-end mb-1">
+                      <span className="text-[10px] uppercase text-slate-400 font-semibold tracking-wider">Perda Estimada</span>
+                      <span className={`font-bold ${quedaPercentual <= 3 ? 'text-green-500' : quedaPercentual <= 5 ? 'text-yellow-500' : 'text-red-500'}`}>
+                        {quedaPercentual.toFixed(2)}% ({quedaTensao.toFixed(2)}V)
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-200 rounded-full h-2.5">
+                      <div 
+                        className={`h-2.5 rounded-full ${quedaPercentual <= 3 ? 'bg-green-500' : quedaPercentual <= 5 ? 'bg-yellow-500' : 'bg-red-500'}`} 
+                        style={{ width: `${Math.min(quedaPercentual, 100)}%` }}
+                      ></div>
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-2 font-medium">
+                      {quedaPercentual <= 3 
+                        ? 'Queda aceitável (≤ 3%).' 
+                        : quedaPercentual <= 5 
+                        ? 'Atenção: Queda marginal (3% - 5%).' 
+                        : 'Inaceitável: Aumente a bitola ou reduza a distância (> 5%).'}
+                    </p>
                   </div>
                 </div>
               </div>
