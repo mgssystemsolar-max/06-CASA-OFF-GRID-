@@ -5,23 +5,26 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 interface LoadItem {
   id: string;
   nome: string;
+  qtd: number;
   w: number;
   h: number;
+  fatorPartida: number;
 }
 
 export default function App() {
   const [itens, setItens] = useState<LoadItem[]>([
-    { id: '1', nome: "Geladeira", w: 150, h: 24 },
-    { id: '2', nome: "Lâmpadas (10x10W)", w: 100, h: 5 },
-    { id: '3', nome: "Televisão", w: 100, h: 4 },
-    { id: '4', nome: "Computador", w: 200, h: 3 },
-    { id: '5', nome: "Outros", w: 250, h: 3 }
+    { id: '1', nome: "Geladeira", qtd: 1, w: 150, h: 24, fatorPartida: 5 },
+    { id: '2', nome: "Lâmpadas (10W)", qtd: 10, w: 10, h: 5, fatorPartida: 1 },
+    { id: '3', nome: "Televisão", qtd: 1, w: 100, h: 4, fatorPartida: 1 },
+    { id: '4', nome: "Computador", qtd: 1, w: 200, h: 3, fatorPartida: 1 },
+    { id: '5', nome: "Outros", qtd: 1, w: 250, h: 3, fatorPartida: 1 }
   ]);
   const [potPainel, setPotPainel] = useState<number>(550);
   const [tensao, setTensao] = useState<number>(24);
   const [tipoBateria, setTipoBateria] = useState<string>('Chumbo');
   const [comprimentoCabo, setComprimentoCabo] = useState<number>(5);
   const [eficienciaInversor, setEficienciaInversor] = useState<number>(90);
+  const [fatorCorrecaoConsumo, setFatorCorrecaoConsumo] = useState<number>(20);
   const [diasAutonomia, setDiasAutonomia] = useState<number>(2);
   const [dod, setDod] = useState<number>(30);
   const [eficienciaCoulombica, setEficienciaCoulombica] = useState<number>(90);
@@ -38,7 +41,7 @@ export default function App() {
   }, [tipoBateria]);
 
   const adicionarLinha = () => {
-    setItens([...itens, { id: Date.now().toString(), nome: "Novo Item", w: 0, h: 0 }]);
+    setItens([...itens, { id: Date.now().toString(), nome: "Novo Item", qtd: 1, w: 0, h: 0, fatorPartida: 1 }]);
   };
 
   const updateItem = (id: string, campo: keyof LoadItem, valor: string | number) => {
@@ -66,21 +69,36 @@ export default function App() {
     quedaTensao,
     quedaPercentual,
     totalWh,
-    geracaoEstimada
+    consumoCorrigido,
+    geracaoEstimada,
+    bateriasEmParalelo,
+    bateriasEmSerie,
+    totalBaterias
   } = useMemo(() => {
     let totalWh = 0;
-    let maiorPico = 0;
+    let totalWNominal = 0;
+    let maiorPicoExtra = 0;
     const hsp = 5;
 
     itens.forEach(it => {
-      totalWh += (it.w * it.h);
-      const nomeLower = it.nome.toLowerCase();
-      const p = (nomeLower.includes('geladeira') || nomeLower.includes('bomba')) ? it.w * 5 : it.w * 1.2;
-      if (p > maiorPico) maiorPico = p;
+      const qtd = it.qtd > 0 ? it.qtd : 1;
+      totalWh += (it.w * it.h * qtd);
+      totalWNominal += (it.w * qtd);
+      
+      // O pico extra é a potência que o equipamento exige ALÉM da sua potência nominal na partida
+      const fator = it.fatorPartida > 0 ? it.fatorPartida : 1;
+      const picoExtra = (it.w * qtd) * (fator - 1);
+      
+      if (picoExtra > maiorPicoExtra) maiorPicoExtra = picoExtra;
     });
 
+    const consumoCorrigido = totalWh * (1 + (fatorCorrecaoConsumo / 100));
+
+    // O inversor precisa suportar a soma de todas as potências nominais + o pior pico de partida extra
+    const maiorPico = totalWNominal + maiorPicoExtra;
+
     const efi = (eficienciaInversor > 0 ? eficienciaInversor : 100) / 100;
-    const Ed = totalWh / efi;
+    const Ed = consumoCorrigido / efi;
 
     const nP = Math.ceil((Ed * 1.25) / (hsp * potPainel));
     const geracaoEstimada = nP * potPainel * hsp;
@@ -118,12 +136,13 @@ export default function App() {
       quedaTensao,
       quedaPercentual,
       totalWh,
+      consumoCorrigido,
       geracaoEstimada,
       bateriasEmParalelo: isNaN(bateriasEmParalelo) || !isFinite(bateriasEmParalelo) ? 0 : bateriasEmParalelo,
       bateriasEmSerie: isNaN(bateriasEmSerie) || !isFinite(bateriasEmSerie) ? 0 : bateriasEmSerie,
       totalBaterias: isNaN(totalBaterias) || !isFinite(totalBaterias) ? 0 : totalBaterias
     };
-  }, [itens, potPainel, tensao, tipoBateria, comprimentoCabo, eficienciaInversor, diasAutonomia, dod, eficienciaCoulombica, fatorTemperatura, capacidadeBateriaIndividual, tensaoBateriaIndividual]);
+  }, [itens, potPainel, tensao, tipoBateria, comprimentoCabo, eficienciaInversor, fatorCorrecaoConsumo, diasAutonomia, dod, eficienciaCoulombica, fatorTemperatura, capacidadeBateriaIndividual, tensaoBateriaIndividual]);
 
   const formatCurrency = (value: number) => {
     return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -162,7 +181,9 @@ export default function App() {
                   <thead>
                     <tr className="border-b text-sm text-slate-400">
                       <th className="pb-2 font-medium">Equipamento</th>
+                      <th className="pb-2 font-medium w-20">Qtd.</th>
                       <th className="pb-2 font-medium w-24">Potência (W)</th>
+                      <th className="pb-2 font-medium w-24" title="Fator IP/In (Pico de Partida)">Fator Partida</th>
                       <th className="pb-2 font-medium w-24">Horas/Dia</th>
                       <th className="pb-2 font-medium w-32 text-right">Consumo Diário (Wh)</th>
                       <th className="pb-2 font-medium w-10"></th>
@@ -176,8 +197,17 @@ export default function App() {
                             type="text" 
                             value={item.nome} 
                             onChange={(e) => updateItem(item.id, 'nome', e.target.value)} 
-                            className="w-full bg-transparent font-bold outline-none focus:ring-2 focus:ring-yellow-400 rounded px-1"
-                            placeholder="Nome do item"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                            placeholder="Nome do equipamento"
+                          />
+                        </td>
+                        <td className="py-2 pr-2">
+                          <input 
+                            type="number" 
+                            value={item.qtd || ''} 
+                            onChange={(e) => updateItem(item.id, 'qtd', e.target.value)} 
+                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                            min="1"
                           />
                         </td>
                         <td className="py-2 pr-2">
@@ -185,8 +215,19 @@ export default function App() {
                             type="number" 
                             value={item.w || ''} 
                             onChange={(e) => updateItem(item.id, 'w', e.target.value)} 
-                            className="w-full bg-transparent outline-none focus:ring-2 focus:ring-yellow-400 rounded px-1"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-yellow-400"
                             min="0"
+                          />
+                        </td>
+                        <td className="py-2 pr-2">
+                          <input 
+                            type="number" 
+                            value={item.fatorPartida || ''} 
+                            onChange={(e) => updateItem(item.id, 'fatorPartida', e.target.value)} 
+                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                            min="1"
+                            step="0.1"
+                            title="Multiplicador de pico de partida (ex: 5 para geladeiras)"
                           />
                         </td>
                         <td className="py-2 pr-2">
@@ -194,13 +235,13 @@ export default function App() {
                             type="number" 
                             value={item.h || ''} 
                             onChange={(e) => updateItem(item.id, 'h', e.target.value)} 
-                            className="w-full bg-transparent outline-none focus:ring-2 focus:ring-yellow-400 rounded px-1"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-yellow-400"
                             min="0"
                             max="24"
                           />
                         </td>
                         <td className="py-2 pr-4 text-right font-bold text-slate-600">
-                          {((item.w || 0) * (item.h || 0)).toLocaleString('pt-BR')}
+                          {((item.w || 0) * (item.h || 0) * (item.qtd || 1)).toLocaleString('pt-BR')}
                         </td>
                         <td className="py-2 text-right">
                           <button 
@@ -216,11 +257,20 @@ export default function App() {
                   </tbody>
                   <tfoot>
                     <tr className="border-t-2 border-slate-200">
-                      <td colSpan={3} className="py-3 text-right font-bold text-slate-500 uppercase text-xs tracking-wider">
-                        Total
+                      <td colSpan={5} className="py-3 text-right font-bold text-slate-500 uppercase text-xs tracking-wider">
+                        Consumo Base
                       </td>
                       <td className="py-3 pr-4 text-right font-black text-slate-800 text-lg">
                         {totalWh.toLocaleString('pt-BR')} Wh
+                      </td>
+                      <td></td>
+                    </tr>
+                    <tr className="border-t border-slate-100 bg-yellow-50/50">
+                      <td colSpan={5} className="py-3 text-right font-bold text-yellow-600 uppercase text-xs tracking-wider">
+                        Consumo Corrigido (+{fatorCorrecaoConsumo}%)
+                      </td>
+                      <td className="py-3 pr-4 text-right font-black text-yellow-600 text-lg">
+                        {consumoCorrigido.toLocaleString('pt-BR')} Wh
                       </td>
                       <td></td>
                     </tr>
@@ -244,6 +294,18 @@ export default function App() {
                       />
                     </label>
                     <label className="block text-sm font-bold text-slate-700">
+                      Margem Seg. Consumo (%): 
+                      <input 
+                        type="number" 
+                        value={fatorCorrecaoConsumo || ''} 
+                        onChange={(e) => setFatorCorrecaoConsumo(parseFloat(e.target.value) || 0)} 
+                        className="mt-1 w-full bg-slate-50 p-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                        min="0"
+                      />
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="block text-sm font-bold text-slate-700">
                       Efic. Inversor (%): 
                       <input 
                         type="number" 
@@ -254,8 +316,6 @@ export default function App() {
                         max="100"
                       />
                     </label>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
                     <label className="block text-sm font-bold text-slate-700">
                       Tensão do Sistema:
                       <select 
@@ -268,6 +328,8 @@ export default function App() {
                         <option value="48">48V</option>
                       </select>
                     </label>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
                     <label className="block text-sm font-bold text-slate-700">
                       Tipo de Bateria:
                       <select 
@@ -279,17 +341,19 @@ export default function App() {
                         <option value="Chumbo">Chumbo</option>
                       </select>
                     </label>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
                     <label className="block text-sm font-bold text-slate-700">
-                      Dias Autonomia (Qd):
+                      Dias de Autonomia (Qd):
                       <input 
                         type="number" 
                         value={diasAutonomia || ''} 
                         onChange={(e) => setDiasAutonomia(parseFloat(e.target.value) || 0)} 
                         className="mt-1 w-full bg-slate-50 p-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                        min="1"
+                        step="1"
                       />
                     </label>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
                     <label className="block text-sm font-bold text-slate-700">
                       DoD Máximo (%):
                       <input 
@@ -299,8 +363,6 @@ export default function App() {
                         className="mt-1 w-full bg-slate-50 p-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-yellow-400"
                       />
                     </label>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
                     <label className="block text-sm font-bold text-slate-700">
                       Efic. Coulômbica (%):
                       <input 
@@ -310,6 +372,8 @@ export default function App() {
                         className="mt-1 w-full bg-slate-50 p-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-yellow-400"
                       />
                     </label>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
                     <label className="block text-sm font-bold text-slate-700">
                       Fator Temp. (Kt):
                       <input 
@@ -320,8 +384,6 @@ export default function App() {
                         step="0.1"
                       />
                     </label>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
                     <label className="block text-sm font-bold text-slate-700">
                       Capacidade Bat. (Ah):
                       <input 
@@ -331,6 +393,8 @@ export default function App() {
                         className="mt-1 w-full bg-slate-50 p-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-yellow-400"
                       />
                     </label>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
                     <label className="block text-sm font-bold text-slate-700">
                       Tensão Bat. (V):
                       <select 
@@ -429,11 +493,14 @@ export default function App() {
 
           <div className="space-y-6">
             <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-8 rounded-3xl text-white shadow-2xl flex flex-col justify-center">
-              <h3 className="text-yellow-500 font-bold uppercase text-xs tracking-wider mb-8">Hardware Necessário</h3>
+              <h3 className="text-yellow-500 font-bold uppercase text-xs tracking-wider mb-8">Kit Solar Fotovoltaico</h3>
               <div className="space-y-8">
                 <div>
-                  <p className="text-slate-400 text-xs uppercase font-bold tracking-wider mb-1">Painéis</p>
-                  <div className="text-6xl font-black">{nP}</div>
+                  <p className="text-slate-400 text-xs uppercase font-bold tracking-wider mb-1">Painéis ({potPainel}W)</p>
+                  <div className="text-6xl font-black">{nP} <span className="text-2xl">unidades</span></div>
+                  <div className="mt-2 text-sm text-slate-400 font-medium">
+                    Potência Total: {(nP * potPainel).toLocaleString('pt-BR')} Wp
+                  </div>
                 </div>
                 <div>
                   <p className="text-slate-400 text-xs uppercase font-bold tracking-wider mb-1">Baterias ({tensaoBateriaIndividual}V / {capacidadeBateriaIndividual}Ah)</p>
@@ -453,8 +520,9 @@ export default function App() {
                     data={[
                       {
                         name: 'Energia (Wh)',
-                        Consumo: totalWh,
-                        Geração: geracaoEstimada,
+                        'Consumo Diário Total': totalWh,
+                        'Consumo Corrigido': consumoCorrigido,
+                        'Geração Solar Estimada': geracaoEstimada,
                       },
                     ]}
                     margin={{ top: 20, right: 0, left: -20, bottom: 0 }}
@@ -468,8 +536,9 @@ export default function App() {
                       formatter={(value: number) => [`${value.toLocaleString('pt-BR')} Wh`, '']}
                     />
                     <Legend iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
-                    <Bar dataKey="Consumo" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={60} />
-                    <Bar dataKey="Geração" fill="#22c55e" radius={[4, 4, 0, 0]} maxBarSize={60} />
+                    <Bar dataKey="Consumo Diário Total" fill="#94a3b8" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                    <Bar dataKey="Consumo Corrigido" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                    <Bar dataKey="Geração Solar Estimada" fill="#22c55e" radius={[4, 4, 0, 0]} maxBarSize={40} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
