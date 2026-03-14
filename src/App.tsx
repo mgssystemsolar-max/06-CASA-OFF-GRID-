@@ -31,6 +31,7 @@ export default function App() {
   const [comprimentoCabo, setComprimentoCabo] = useState<number>(5);
   const [eficienciaInversor, setEficienciaInversor] = useState<number>(90);
   const [fatorCorrecaoConsumo, setFatorCorrecaoConsumo] = useState<number>(20);
+  const [eficienciaSistema, setEficienciaSistema] = useState<number>(80);
   const [diasAutonomia, setDiasAutonomia] = useState<number>(2);
   const [dod, setDod] = useState<number>(30);
   const [eficienciaCoulombica, setEficienciaCoulombica] = useState<number>(90);
@@ -58,7 +59,15 @@ export default function App() {
   const updateItem = (id: string, campo: keyof LoadItem, valor: string | number) => {
     setItens(itens.map(item => {
       if (item.id === id) {
-        return { ...item, [campo]: campo === 'nome' ? valor : (parseFloat(valor as string) || 0) };
+        let parsedValue: string | number = campo === 'nome' ? valor : (parseFloat(valor as string) || 0);
+        
+        if (campo === 'h') {
+          parsedValue = Math.min(Math.max(parsedValue as number, 0), 24);
+        } else if (campo === 'w' || campo === 'qtd' || campo === 'fatorPartida') {
+          parsedValue = Math.max(parsedValue as number, 0);
+        }
+
+        return { ...item, [campo]: parsedValue };
       }
       return item;
     }));
@@ -109,10 +118,11 @@ export default function App() {
     const maiorPico = totalWNominal + maiorPicoExtra;
 
     const efi = (eficienciaInversor > 0 ? eficienciaInversor : 100) / 100;
+    const efiSys = (eficienciaSistema > 0 ? eficienciaSistema : 100) / 100;
     const Ed = consumoCorrigido / efi;
 
     const nP = Math.ceil((Ed * 1.25) / (hsp * potPainel));
-    const geracaoEstimada = nP * potPainel * hsp;
+    const geracaoEstimada = nP * potPainel * hsp * efiSys;
     
     const Kp = dod / 100;
     const Kc = eficienciaCoulombica / 100;
@@ -153,7 +163,7 @@ export default function App() {
       bateriasEmSerie: isNaN(bateriasEmSerie) || !isFinite(bateriasEmSerie) ? 0 : bateriasEmSerie,
       totalBaterias: isNaN(totalBaterias) || !isFinite(totalBaterias) ? 0 : totalBaterias
     };
-  }, [itens, potPainel, tensao, tipoBateria, comprimentoCabo, eficienciaInversor, fatorCorrecaoConsumo, diasAutonomia, dod, eficienciaCoulombica, fatorTemperatura, capacidadeBateriaIndividual, tensaoBateriaIndividual]);
+  }, [itens, potPainel, tensao, tipoBateria, comprimentoCabo, eficienciaInversor, fatorCorrecaoConsumo, eficienciaSistema, diasAutonomia, dod, eficienciaCoulombica, fatorTemperatura, capacidadeBateriaIndividual, tensaoBateriaIndividual]);
 
   const formatCurrency = (value: number) => {
     return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -242,7 +252,8 @@ export default function App() {
                     <tr className="border-b text-sm text-slate-400">
                       <th className="pb-2 font-medium">Equipamento</th>
                       <th className="pb-2 font-medium w-20">Qtd.</th>
-                      <th className="pb-2 font-medium w-24">Potência (W)</th>
+                      <th className="pb-2 font-medium w-24">Pot. Unitária (W)</th>
+                      <th className="pb-2 font-medium w-24">Pot. Total (W)</th>
                       <th className="pb-2 font-medium w-24" title="Fator IP/In (Pico de Partida)">Fator Partida</th>
                       <th className="pb-2 font-medium w-24">Horas/Dia</th>
                       <th className="pb-2 font-medium w-32 text-right">Consumo Diário (Wh)</th>
@@ -267,7 +278,7 @@ export default function App() {
                             value={item.qtd || ''} 
                             onChange={(e) => updateItem(item.id, 'qtd', e.target.value)} 
                             className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                            min="1"
+                            min="0"
                           />
                         </td>
                         <td className="py-2 pr-2">
@@ -278,6 +289,11 @@ export default function App() {
                             className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-yellow-400"
                             min="0"
                           />
+                        </td>
+                        <td className="py-2 pr-2">
+                          <div className="w-full bg-slate-100 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-500 font-medium">
+                            {((item.w || 0) * (item.qtd || 0)).toLocaleString('pt-BR')}
+                          </div>
                         </td>
                         <td className="py-2 pr-2">
                           <input 
@@ -301,7 +317,7 @@ export default function App() {
                           />
                         </td>
                         <td className="py-2 pr-4 text-right font-bold text-slate-600">
-                          {((item.w || 0) * (item.h || 0) * (item.qtd || 1)).toLocaleString('pt-BR')}
+                          {((item.w || 0) * (item.h || 0) * (item.qtd || 0)).toLocaleString('pt-BR')}
                         </td>
                         <td className="py-2 text-right">
                           <button 
@@ -317,7 +333,7 @@ export default function App() {
                   </tbody>
                   <tfoot>
                     <tr className="border-t-2 border-slate-200">
-                      <td colSpan={5} className="py-3 text-right font-bold text-slate-500 uppercase text-xs tracking-wider">
+                      <td colSpan={6} className="py-3 text-right font-bold text-slate-500 uppercase text-xs tracking-wider">
                         Consumo Base
                       </td>
                       <td className="py-3 pr-4 text-right font-black text-slate-800 text-lg">
@@ -326,7 +342,7 @@ export default function App() {
                       <td></td>
                     </tr>
                     <tr className="border-t border-slate-100 bg-yellow-50/50">
-                      <td colSpan={5} className="py-3 text-right font-bold text-yellow-600 uppercase text-xs tracking-wider">
+                      <td colSpan={6} className="py-3 text-right font-bold text-yellow-600 uppercase text-xs tracking-wider">
                         Consumo Corrigido (+{fatorCorrecaoConsumo}%)
                       </td>
                       <td className="py-3 pr-4 text-right font-black text-yellow-600 text-lg">
@@ -376,6 +392,19 @@ export default function App() {
                         max="100"
                       />
                     </label>
+                    <label className="block text-sm font-bold text-slate-700">
+                      Efic. Geral Sist. (%): 
+                      <input 
+                        type="number" 
+                        value={eficienciaSistema || ''} 
+                        onChange={(e) => setEficienciaSistema(parseFloat(e.target.value) || 0)} 
+                        className="mt-1 w-full bg-slate-50 p-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                        min="1"
+                        max="100"
+                      />
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
                     <label className="block text-sm font-bold text-slate-700">
                       Tensão do Sistema:
                       <select 
