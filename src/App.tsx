@@ -21,13 +21,15 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (email && password) {
+    setError('');
+    if (email.trim() && password.trim()) {
       onLogin();
     } else {
-      alert('Por favor, preencha todos os campos.');
+      setError('Por favor, preencha todos os campos.');
     }
   };
 
@@ -47,13 +49,21 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
         </div>
 
         <form onSubmit={handleLogin} className="space-y-5">
+          {error && (
+            <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-3 rounded-xl text-sm text-center font-medium border border-red-100 dark:border-red-900/30">
+              {error}
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">E-mail</label>
             <input 
               type="email" 
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:text-white"
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (error) setError('');
+              }}
+              className={`w-full bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border ${error && !email.trim() ? 'border-red-300 dark:border-red-500/50 focus:ring-red-500/20 focus:border-red-500' : 'border-slate-200 dark:border-slate-700 focus:ring-blue-500/20 focus:border-blue-500'} focus:outline-none focus:ring-2 transition-all dark:text-white`}
               placeholder="seu@email.com"
             />
           </div>
@@ -63,8 +73,11 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
               <input 
                 type={showPassword ? "text" : "password"} 
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:text-white pr-10"
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (error) setError('');
+                }}
+                className={`w-full bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border ${error && !password.trim() ? 'border-red-300 dark:border-red-500/50 focus:ring-red-500/20 focus:border-red-500' : 'border-slate-200 dark:border-slate-700 focus:ring-blue-500/20 focus:border-blue-500'} focus:outline-none focus:ring-2 transition-all dark:text-white pr-10`}
                 placeholder="••••••••"
               />
               <button 
