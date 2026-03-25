@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Plus, Printer, Trash2, LayoutDashboard, Users, FolderOpen, Settings, Calculator, FileText, Eye, EyeOff, Sun, Moon, LogOut } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { Plus, Printer, Trash2, LayoutDashboard, Users, FolderOpen, Settings, Calculator, FileText, Eye, EyeOff, Sun, Moon, LogOut, HelpCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 interface LoadItem {
   id: string;
@@ -147,6 +147,9 @@ export default function App() {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
 
+  const [activeTab, setActiveTab] = useState<'dimensionamento' | 'suporte'>('dimensionamento');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
   const [itens, setItens] = useState<LoadItem[]>([
     { id: '1', nome: "Geladeira", qtd: 1, w: 150, h: 24, fatorPartida: 5 },
     { id: '2', nome: "Lâmpadas (10W)", qtd: 10, w: 10, h: 5, fatorPartida: 1 },
@@ -161,12 +164,18 @@ export default function App() {
   const [eficienciaInversor, setEficienciaInversor] = useState<number>(90);
   const [fatorCorrecaoConsumo, setFatorCorrecaoConsumo] = useState<number>(20);
   const [eficienciaSistema, setEficienciaSistema] = useState<number>(80);
+  const [horasSolPleno, setHorasSolPleno] = useState<number>(5);
   const [diasAutonomia, setDiasAutonomia] = useState<number>(2);
   const [dod, setDod] = useState<number>(30);
   const [eficienciaCoulombica, setEficienciaCoulombica] = useState<number>(90);
   const [fatorTemperatura, setFatorTemperatura] = useState<number>(1);
   const [capacidadeBateriaIndividual, setCapacidadeBateriaIndividual] = useState<number>(220);
   const [tensaoBateriaIndividual, setTensaoBateriaIndividual] = useState<number>(12);
+  const [custoWpPainel, setCustoWpPainel] = useState<number>(2.5);
+  const [custoWpInversor, setCustoWpInversor] = useState<number>(1.5);
+  const [ciclosVida, setCiclosVida] = useState<number>(500);
+  const [limiteCorrenteCarga, setLimiteCorrenteCarga] = useState<number>(20);
+  const [custoAhBateria, setCustoAhBateria] = useState<number>(10);
 
   const [clienteNome, setClienteNome] = useState('');
   const [clienteTelefone, setClienteTelefone] = useState('');
@@ -176,8 +185,16 @@ export default function App() {
   useEffect(() => {
     if (tipoBateria === 'Lítio') {
       setDod(85);
+      setCiclosVida(2000);
+      setLimiteCorrenteCarga(50);
+    } else if (tipoBateria === 'LiFePO4') {
+      setDod(90);
+      setCiclosVida(4000);
+      setLimiteCorrenteCarga(100);
     } else {
       setDod(30);
+      setCiclosVida(500);
+      setLimiteCorrenteCarga(20);
     }
   }, [tipoBateria]);
 
@@ -222,12 +239,13 @@ export default function App() {
       geracaoEstimada,
       bateriasEmParalelo,
       bateriasEmSerie,
-      totalBaterias
+      totalBaterias,
+      custoTotalBaterias
     } = useMemo(() => {
       let totalWh = 0;
       let totalWNominal = 0;
       let maiorPicoExtra = 0;
-      const hsp = 5;
+      const hsp = horasSolPleno > 0 ? horasSolPleno : 5;
   
       itens.forEach(it => {
         const qtd = it.qtd > 0 ? it.qtd : 1;
@@ -260,14 +278,17 @@ export default function App() {
       const bateriasEmParalelo = Math.round(bat / capacidadeBateriaIndividual);
       const bateriasEmSerie = Math.ceil(tensao / tensaoBateriaIndividual);
       const totalBaterias = bateriasEmParalelo * bateriasEmSerie;
+      const custoTotalBaterias = totalBaterias * capacidadeBateriaIndividual * custoAhBateria;
       
       const amp = (nP * potPainel) / tensao;
       
       let bitola = amp > 50 ? 16 : (amp > 30 ? 10 : 6);
   
-      const inv = (nP * potPainel) * 5.8;
+      const custoPaineis = (nP * potPainel) * custoWpPainel;
+      const custoInversor = maiorPico * custoWpInversor;
+      const inv = custoPaineis + custoInversor;
       const eco = (totalWh / 1000) * 30 * 0.95;
-    const man = (tipoBateria === 'Lítio') ? (bat * tensao * 1.2) : (bat * tensao * 3.5);
+    const man = (tipoBateria === 'Lítio' || tipoBateria === 'LiFePO4') ? (bat * tensao * 1.2) : (bat * tensao * 3.5);
     const lucro = ((eco * 12 * 10) - inv - man);
 
       const ampControlador = isNaN(amp) || !isFinite(amp) ? 0 : Math.ceil(amp * 1.1);
@@ -290,9 +311,10 @@ export default function App() {
         geracaoEstimada,
         bateriasEmParalelo: isNaN(bateriasEmParalelo) || !isFinite(bateriasEmParalelo) ? 0 : bateriasEmParalelo,
         bateriasEmSerie: isNaN(bateriasEmSerie) || !isFinite(bateriasEmSerie) ? 0 : bateriasEmSerie,
-        totalBaterias: isNaN(totalBaterias) || !isFinite(totalBaterias) ? 0 : totalBaterias
+        totalBaterias: isNaN(totalBaterias) || !isFinite(totalBaterias) ? 0 : totalBaterias,
+        custoTotalBaterias: isNaN(custoTotalBaterias) || !isFinite(custoTotalBaterias) ? 0 : custoTotalBaterias
       };
-  }, [itens, potPainel, tensao, tipoBateria, comprimentoCabo, eficienciaInversor, fatorCorrecaoConsumo, eficienciaSistema, diasAutonomia, dod, eficienciaCoulombica, fatorTemperatura, capacidadeBateriaIndividual, tensaoBateriaIndividual]);
+  }, [itens, potPainel, tensao, tipoBateria, comprimentoCabo, eficienciaInversor, fatorCorrecaoConsumo, eficienciaSistema, diasAutonomia, dod, eficienciaCoulombica, fatorTemperatura, capacidadeBateriaIndividual, tensaoBateriaIndividual, custoAhBateria, horasSolPleno]);
 
   const formatCurrency = (value: number) => {
     return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -305,63 +327,87 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#f1f5f9] dark:bg-slate-900 font-sans text-slate-800 dark:text-slate-100 flex transition-colors duration-300">
       {/* Sidebar */}
-      <aside className="w-64 bg-[#0f172a] dark:bg-slate-950 text-white hidden md:flex flex-col fixed h-full z-10 transition-colors duration-300">
-        <div className="p-6 flex items-center gap-3 border-b border-slate-800">
-          <div className="w-8 h-8 bg-yellow-500 rounded-lg flex items-center justify-center">
+      <aside className={`${isSidebarCollapsed ? 'w-20' : 'w-64'} bg-[#0f172a] dark:bg-slate-950 text-white hidden md:flex flex-col fixed h-full z-10 transition-all duration-300`}>
+        <button
+          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          className="absolute -right-3 top-8 bg-blue-600 text-white p-1 rounded-full shadow-lg hover:bg-blue-700 transition-colors z-20"
+        >
+          {isSidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+        </button>
+        <div className={`p-6 flex items-center gap-3 border-b border-slate-800 ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}>
+          <div className="w-8 h-8 bg-yellow-500 rounded-lg flex items-center justify-center shrink-0">
             <span className="font-bold text-[#0f172a]">S</span>
           </div>
-          <h1 className="text-xl font-black tracking-tight">
-            SOLAR<span className="text-yellow-500">PRO</span>
-          </h1>
+          {!isSidebarCollapsed && (
+            <h1 className="text-xl font-black tracking-tight whitespace-nowrap">
+              SOLAR<span className="text-yellow-500">PRO</span>
+            </h1>
+          )}
         </div>
-        <nav className="flex-1 p-4 space-y-2">
-          <a href="#" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-400 font-medium transition-colors">
-            <LayoutDashboard size={20} />
-            Dashboard
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto overflow-x-hidden">
+          <a href="#" className={`flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-400 font-medium transition-colors ${isSidebarCollapsed ? 'justify-center px-0' : ''}`} title="Dashboard">
+            <LayoutDashboard size={20} className="shrink-0" />
+            {!isSidebarCollapsed && <span className="whitespace-nowrap">Dashboard</span>}
           </a>
-          <a href="#" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-400 font-medium transition-colors">
-            <Users size={20} />
-            Clientes
+          <a href="#" className={`flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-400 font-medium transition-colors ${isSidebarCollapsed ? 'justify-center px-0' : ''}`} title="Clientes">
+            <Users size={20} className="shrink-0" />
+            {!isSidebarCollapsed && <span className="whitespace-nowrap">Clientes</span>}
           </a>
-          <a href="#" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-400 font-medium transition-colors">
-            <FolderOpen size={20} />
-            Projetos
+          <a href="#" className={`flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-400 font-medium transition-colors ${isSidebarCollapsed ? 'justify-center px-0' : ''}`} title="Projetos">
+            <FolderOpen size={20} className="shrink-0" />
+            {!isSidebarCollapsed && <span className="whitespace-nowrap">Projetos</span>}
           </a>
-          <a href="#" className="flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-900/30 text-blue-400 font-medium transition-colors">
-            <Calculator size={20} />
-            Dimensionamento
+          <button 
+            onClick={() => setActiveTab('dimensionamento')} 
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'dimensionamento' ? 'bg-blue-900/30 text-blue-400' : 'hover:bg-slate-800 text-slate-400'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
+            title="Dimensionamento"
+          >
+            <Calculator size={20} className="shrink-0" />
+            {!isSidebarCollapsed && <span className="whitespace-nowrap">Dimensionamento</span>}
+          </button>
+          <button 
+            onClick={() => setActiveTab('suporte')} 
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'suporte' ? 'bg-blue-900/30 text-blue-400' : 'hover:bg-slate-800 text-slate-400'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
+            title="Manual e Suporte"
+          >
+            <HelpCircle size={20} className="shrink-0" />
+            {!isSidebarCollapsed && <span className="whitespace-nowrap">Manual e Suporte</span>}
+          </button>
+          <a href="#" className={`flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-400 font-medium transition-colors ${isSidebarCollapsed ? 'justify-center px-0' : ''}`} title="Relatórios">
+            <FileText size={20} className="shrink-0" />
+            {!isSidebarCollapsed && <span className="whitespace-nowrap">Relatórios</span>}
           </a>
-          <a href="#" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-400 font-medium transition-colors">
-            <FileText size={20} />
-            Relatórios
-          </a>
-          <a href="#" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-400 font-medium transition-colors">
-            <Settings size={20} />
-            Configurações
+          <a href="#" className={`flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-400 font-medium transition-colors ${isSidebarCollapsed ? 'justify-center px-0' : ''}`} title="Configurações">
+            <Settings size={20} className="shrink-0" />
+            {!isSidebarCollapsed && <span className="whitespace-nowrap">Configurações</span>}
           </a>
         </nav>
         <div className="p-4 border-t border-slate-800 space-y-2">
           <button 
             onClick={toggleTheme}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-400 font-medium transition-colors"
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-400 font-medium transition-colors ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
+            title={theme === 'light' ? 'Modo Escuro' : 'Modo Claro'}
           >
-            {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
-            {theme === 'light' ? 'Modo Escuro' : 'Modo Claro'}
+            {theme === 'light' ? <Moon size={20} className="shrink-0" /> : <Sun size={20} className="shrink-0" />}
+            {!isSidebarCollapsed && <span className="whitespace-nowrap">{theme === 'light' ? 'Modo Escuro' : 'Modo Claro'}</span>}
           </button>
           <button 
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-900/30 text-red-400 font-medium transition-colors"
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-900/30 text-red-400 font-medium transition-colors ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
+            title="Sair"
           >
-            <LogOut size={20} />
-            Sair
+            <LogOut size={20} className="shrink-0" />
+            {!isSidebarCollapsed && <span className="whitespace-nowrap">Sair</span>}
           </button>
         </div>
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 md:ml-64 p-4 md:p-8">
+      <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'md:ml-20' : 'md:ml-64'} p-4 md:p-8`}>
         <div className="max-w-7xl mx-auto">
-          <header className="flex justify-between items-center mb-8 print:hidden">
+          {activeTab === 'dimensionamento' ? (
+            <>
+              <header className="flex justify-between items-center mb-8 print:hidden">
             <div>
               <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Dimensionamento Solar</h2>
               <p className="text-slate-500 dark:text-slate-400 text-sm">Configure o sistema off-grid para seu cliente</p>
@@ -576,6 +622,19 @@ export default function App() {
                       />
                     </label>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                      Horas de Sol Pleno (HSP): 
+                      <input 
+                        type="number" 
+                        value={horasSolPleno || ''} 
+                        onChange={(e) => setHorasSolPleno(parseFloat(e.target.value) || 0)} 
+                        className="mt-1.5 w-full bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:text-white"
+                        min="1"
+                        step="0.1"
+                      />
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                       Margem Seg. Consumo (%): 
                       <input 
                         type="number" 
@@ -585,8 +644,6 @@ export default function App() {
                         min="0"
                       />
                     </label>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                       Efic. Inversor (%): 
                       <input 
@@ -598,6 +655,8 @@ export default function App() {
                         max="100"
                       />
                     </label>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                       Efic. Geral Sist. (%): 
                       <input 
@@ -634,6 +693,30 @@ export default function App() {
                       />
                     </label>
                   </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                      Custo Painel (R$/Wp):
+                      <input 
+                        type="number" 
+                        value={custoWpPainel || ''} 
+                        onChange={(e) => setCustoWpPainel(parseFloat(e.target.value) || 0)} 
+                        className="mt-1.5 w-full bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:text-white"
+                        min="0"
+                        step="0.1"
+                      />
+                    </label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                      Custo Inversor (R$/W):
+                      <input 
+                        type="number" 
+                        value={custoWpInversor || ''} 
+                        onChange={(e) => setCustoWpInversor(parseFloat(e.target.value) || 0)} 
+                        className="mt-1.5 w-full bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:text-white"
+                        min="0"
+                        step="0.1"
+                      />
+                    </label>
+                  </div>
                 </div>
 
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 space-y-5">
@@ -651,6 +734,7 @@ export default function App() {
                       >
                         <option value="Chumbo">Chumbo-Ácido</option>
                         <option value="Lítio">Lítio</option>
+                        <option value="LiFePO4">Lítio LiFePO4</option>
                       </select>
                     </label>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -709,6 +793,47 @@ export default function App() {
                         min="1"
                       />
                     </label>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                      Ciclos de Vida:
+                      <input 
+                        type="number" 
+                        value={ciclosVida || ''} 
+                        onChange={(e) => setCiclosVida(parseFloat(e.target.value) || 0)} 
+                        className="mt-1.5 w-full bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:text-white"
+                        min="1"
+                      />
+                    </label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                      Limite Corrente Carga (A):
+                      <input 
+                        type="number" 
+                        value={limiteCorrenteCarga || ''} 
+                        onChange={(e) => setLimiteCorrenteCarga(parseFloat(e.target.value) || 0)} 
+                        className="mt-1.5 w-full bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:text-white"
+                        min="1"
+                      />
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                      Custo por Ah (R$):
+                      <input 
+                        type="number" 
+                        value={custoAhBateria || ''} 
+                        onChange={(e) => setCustoAhBateria(parseFloat(e.target.value) || 0)} 
+                        className="mt-1.5 w-full bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:text-white"
+                        min="0"
+                        step="0.1"
+                      />
+                    </label>
+                    <div className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                      Custo Total da Bateria:
+                      <div className="mt-1.5 w-full bg-slate-100 dark:bg-slate-800 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white font-bold">
+                        R$ {custoTotalBaterias.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -806,7 +931,7 @@ export default function App() {
                   <span className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mr-3">8</span>
                   Balanço Energético Diário
                 </h3>
-                <div className="h-64 w-full">
+                <div className="h-72 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={[
@@ -817,7 +942,7 @@ export default function App() {
                           'Geração Solar Estimada': geracaoEstimada,
                         },
                       ]}
-                      margin={{ top: 20, right: 0, left: -20, bottom: 0 }}
+                      margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === 'dark' ? '#334155' : '#e2e8f0'} />
                       <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
@@ -827,10 +952,10 @@ export default function App() {
                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: theme === 'dark' ? '#0f172a' : '#ffffff', color: theme === 'dark' ? '#f8fafc' : '#0f172a' }}
                         formatter={(value: number) => [`${value.toLocaleString('pt-BR')} Wh`, '']}
                       />
-                      <Legend iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
-                      <Bar dataKey="Consumo Diário Total" fill="#94a3b8" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                      <Bar dataKey="Consumo Corrigido" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                      <Bar dataKey="Geração Solar Estimada" fill="#22c55e" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                      <Legend iconType="circle" wrapperStyle={{ fontSize: '13px', paddingTop: '20px' }} />
+                      <Bar dataKey="Consumo Diário Total" fill="#94a3b8" radius={[4, 4, 0, 0]} maxBarSize={60} />
+                      <Bar dataKey="Consumo Corrigido" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={60} />
+                      <Bar dataKey="Geração Solar Estimada" fill="#22c55e" radius={[4, 4, 0, 0]} maxBarSize={60} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -858,6 +983,91 @@ export default function App() {
               </div>
             </div>
           </div>
+          </>
+          ) : (
+            <div className="space-y-8">
+              <header className="mb-8">
+                <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Manual e Suporte</h2>
+                <p className="text-slate-500 dark:text-slate-400 text-sm">Aprenda a usar o sistema e entre em contato</p>
+              </header>
+
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 space-y-6">
+                  <h3 className="font-bold text-slate-800 dark:text-white flex items-center text-lg border-b border-slate-100 dark:border-slate-700 pb-4">
+                    <HelpCircle className="w-5 h-5 mr-2 text-blue-600" />
+                    Funções do Aplicativo
+                  </h3>
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="font-semibold text-slate-800 dark:text-white text-sm">1. Dados do Cliente</h4>
+                      <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Registre o nome e telefone do cliente. Estes dados serão utilizados no cabeçalho da proposta comercial exportada.</p>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-slate-800 dark:text-white text-sm">2. Levantamento de Cargas (Consumo)</h4>
+                      <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Adicione os equipamentos que serão alimentados. Insira a quantidade, potência (W), fator de partida (pico do motor) e horas de uso diário. O app calcula automaticamente o consumo total diário (Wh) e o consumo corrigido considerando as perdas.</p>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-slate-800 dark:text-white text-sm">3. Configuração do Kit Solar</h4>
+                      <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Defina os parâmetros de geração: Potência do painel solar (W), <strong>Horas de Sol Pleno (HSP)</strong> da região, margem de segurança de consumo, eficiência do inversor e do sistema geral. Também configure a tensão do sistema (12V, 24V, 48V) e o comprimento dos cabos para o cálculo de bitola.</p>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-slate-800 dark:text-white text-sm">4. Banco de Baterias (Armazenamento)</h4>
+                      <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Configure o armazenamento de energia: Escolha a tecnologia (Chumbo-Ácido ou Lítio), dias de autonomia desejados, Profundidade de Descarga (DoD) e eficiência. <strong>Novos recursos:</strong> Defina os <strong>Ciclos de Vida</strong>, <strong>Limite de Corrente de Carga</strong>, e o <strong>Custo por Ah</strong> para obter uma estimativa automática do <strong>Custo Total do Banco de Baterias</strong>.</p>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-slate-800 dark:text-white text-sm">5. Resultados do Dimensionamento</h4>
+                      <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">O motor de cálculo fornece instantaneamente: Quantidade total de painéis (e arranjo em série/paralelo), quantidade total de baterias (série/paralelo), dimensionamento do controlador de carga (A), bitola mínima do cabo (mm²) e a queda de tensão (%).</p>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-slate-800 dark:text-white text-sm">6. Gráficos e Análise Financeira (ROI)</h4>
+                      <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Visualize o Balanço Energético Diário através de gráficos interativos (Consumo vs. Geração). Acompanhe a estimativa de Retorno sobre Investimento (ROI) em 10 anos, considerando custos de equipamento, manutenção e lucro líquido estimado.</p>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-slate-800 dark:text-white text-sm">7. Exportação de Proposta</h4>
+                      <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Clique em "Exportar Proposta" para gerar um documento limpo, formatado e pronto para ser salvo em PDF ou impresso para o cliente final, ocultando os menus de navegação.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 h-fit space-y-6">
+                  <h3 className="font-bold text-slate-800 dark:text-white flex items-center text-lg border-b border-slate-100 dark:border-slate-700 pb-4">
+                    <Users className="w-5 h-5 mr-2 text-blue-600" />
+                    Suporte Técnico
+                  </h3>
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center shrink-0">
+                        <span className="text-blue-600 font-bold">@</span>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">E-mail</p>
+                        <p className="text-slate-800 dark:text-white font-medium mt-0.5">mgssystemsolar@gmail.com</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-full bg-green-50 dark:bg-green-900/20 flex items-center justify-center shrink-0">
+                        <span className="text-green-600 font-bold">W</span>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Telefone / WhatsApp</p>
+                        <p className="text-slate-800 dark:text-white font-medium mt-0.5">+55 (88) 988360143</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-full bg-yellow-50 dark:bg-yellow-900/20 flex items-center justify-center shrink-0">
+                        <Sun className="w-5 h-5 text-yellow-600" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Horário de Atendimento</p>
+                        <p className="text-slate-800 dark:text-white font-medium mt-0.5">Horário Comercial</p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">Segunda a Sexta, 08:00 às 18:00</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
